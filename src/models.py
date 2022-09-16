@@ -145,10 +145,10 @@ def run_model_funcs(data, columns, name, n_splits):
             visual_mode="dark"
         )
 
-        mlflow.log_artifact(plot_file_path + ".html")
+    #     mlflow.log_artifact(plot_file_path + ".html")
 
 
-    model_utils.save_model(cv, data, columns, 'Wealth Index', os.path.join(models_dir, f'{name}_cv{n_splits}_best.joblib'))
+    # model_utils.save_model(cv, data, columns, 'Wealth Index', os.path.join(models_dir, f'{name}_cv{n_splits}_best.joblib'))
 
     return cv #, predictions
 
@@ -214,16 +214,16 @@ adm2_cols = [i for i in adm2_df.columns if i not in [geom_id] + indicators]
 adm2_ols = run_OLS(adm2_df, 'Wealth Index', adm2_cols, 'adm2')
 
 
-# =========
-final_featuresx = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
+# # =========
+# final_featuresx = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
 
-xxx_df = pd.concat([
-    final_data_df[[geom_id] + indicators + final_featuresx],
-    pd.get_dummies(final_data_df[['ADM2']], drop_first=True)
-], axis=1)
-xxx_cols = [i for i in xxx_df.columns if i not in [geom_id] + indicators]
-xxx_ols = run_OLS(xxx_df, 'Wealth Index', xxx_cols, 'adm2-final-noesa')
-# =========
+# xxx_df = pd.concat([
+#     final_data_df[[geom_id] + indicators + final_featuresx],
+#     pd.get_dummies(final_data_df[['ADM2']], drop_first=True)
+# ], axis=1)
+# xxx_cols = [i for i in xxx_df.columns if i not in [geom_id] + indicators]
+# xxx_ols = run_OLS(xxx_df, 'Wealth Index', xxx_cols, 'adm2-final-noesa')
+# # =========
 
 
 # # all OSM + NTL

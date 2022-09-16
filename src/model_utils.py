@@ -198,10 +198,8 @@ def evaluate_model(
         #         show=show
         #     )
 
-        print("Fitting CV on full dataset")
         # Get best estimator
-        print("About to fit: ")
-        print(type(cv))
+
         cv.fit(X, y)
 
         if mlflow.active_run() is not None:
@@ -228,14 +226,16 @@ def evaluate_model(
                     output_file=output_file + f"rf_feature_importance_{index}.png",
                     show=show
                 )
+                # mlflow.log_artifact(output_file + f"rf_feature_importance_{index}.png")
             elif model_type == "xgboost":
                 xgb_feature_importance(
                     cv, X, y, size=figsize,
                     output_file=output_file + f"xgb_feature_importance_{index}.png",
                     show=show
                 )
+                # mlflow.log_artifact(output_file + f"xgb_feature_importance_{index}.png")
 
-    return cv #, pd.DataFrame(results)
+    return cv, pd.DataFrame(results)
 
 
 def get_param_grid(model_type='ridge'):
@@ -499,6 +499,9 @@ def nested_cross_validation(
             n_jobs=n_workers,
             refit=refit,
         )
+    else:
+        raise ValueError("Unknown search type!")
+
     # Commence cross validation
     nested_scores = cross_validate(
         cv,
@@ -574,9 +577,7 @@ def plot_cross_val_results(
         wandb.log({'{}'.format(indicator): wandb.Image(plt)})
     if output_file:
         plt.savefig(fname=output_file, bbox_inches="tight")
-    print("show graph?")
     if show:
-        print("show graph now!")
         plt.show(block=False)   
 
 
