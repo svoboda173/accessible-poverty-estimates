@@ -1,7 +1,7 @@
 """
 
 Automatically executes models.py for all projects/country groups whose output_name from config.ini is listed in an
-element of the list "projects". The same hyperparamater configuration from model_utils.py is used for all projects.
+element of the list "projects". The same hyperparameter configuration from model_utils.py is used for all projects.
 
 Using os.system() because models.py is not enclosed within a function.
 
