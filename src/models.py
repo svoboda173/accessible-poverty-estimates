@@ -38,7 +38,7 @@ config.read('config.ini')
 project = config["main"]["project"]
 project_dir = config["main"]["project_dir"]
 
-indicators = json.loads(config["main"]['indicators'])
+indicators = [config["main"]['indicator']]
 # indicators = [
 #     'Wealth Index',
 #     'Education completed (years)',
@@ -58,6 +58,10 @@ os.makedirs(models_dir, exist_ok=True)
 os.makedirs(results_dir, exist_ok=True)
 
 mlflow.set_tracking_uri(config["main"]["mlflow_models_location"])
+
+tags_dict = dict(config["mlflow_tags"])
+if f"{project}.tags" in config.sections():
+    tags_dict.update(dict(config[f"{project}.tags"]))
 
 sys.path.insert(0, os.path.join(project_dir, 'src'))
 
@@ -95,7 +99,7 @@ geom_id = json_data['primary_geom_id']
 # -----------------------------------------------------------------------------
 
 
-def run_model_funcs(data, columns, name, n_splits):
+def run_model_funcs(data, columns, name, n_splits, project=project, tags=dict()):
 
     data_utils.plot_corr(
         data=data,
@@ -118,7 +122,17 @@ def run_model_funcs(data, columns, name, n_splits):
         output_file=os.path.join(results_dir, f'{name}_spearman_corr.png'),
         show=show_plots
     )
-    with mlflow.start_run() as run:
+
+    with mlflow.start_run(run_name=f"{project} - {name}") as run:
+        
+        default_tags = {
+            "project": project,
+            "model_name": name,
+            "output_name": output_name,
+            "indicator": indicators[0]
+        }
+        tags.update(default_tags)
+        mlflow.set_tags(tags)
 
         cv = model_utils.evaluate_model(
             data=data,
@@ -141,17 +155,15 @@ def run_model_funcs(data, columns, name, n_splits):
         data_utils.plot_parallel_coordinates(
             output_file = plot_file_path,
             output_name = output_name,
-            cv_results = cv.cv_results_,
-            visual_mode="dark"
+            cv_results = cv.cv_results_
         )
 
-    #     mlflow.log_artifact(plot_file_path + ".html")
+        mlflow.log_artifact(plot_file_path + ".html")
 
 
-    # model_utils.save_model(cv, data, columns, 'Wealth Index', os.path.join(models_dir, f'{name}_cv{n_splits}_best.joblib'))
+    model_utils.save_model(cv, data, columns, 'Wealth Index', os.path.join(models_dir, f'{name}_cv{n_splits}_best.joblib'))
 
     return cv #, predictions
-
 
 
 def run_OLS(data, y_var, x_vars, name):
@@ -214,69 +226,69 @@ adm2_cols = [i for i in adm2_df.columns if i not in [geom_id] + indicators]
 adm2_ols = run_OLS(adm2_df, 'Wealth Index', adm2_cols, 'adm2')
 
 
-# # =========
-# final_featuresx = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
+# =========
+final_featuresx = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
 
-# xxx_df = pd.concat([
-#     final_data_df[[geom_id] + indicators + final_featuresx],
-#     pd.get_dummies(final_data_df[['ADM2']], drop_first=True)
-# ], axis=1)
-# xxx_cols = [i for i in xxx_df.columns if i not in [geom_id] + indicators]
-# xxx_ols = run_OLS(xxx_df, 'Wealth Index', xxx_cols, 'adm2-final-noesa')
-# # =========
+xxx_df = pd.concat([
+    final_data_df[[geom_id] + indicators + final_featuresx],
+    pd.get_dummies(final_data_df[['ADM2']], drop_first=True)
+], axis=1)
+xxx_cols = [i for i in xxx_df.columns if i not in [geom_id] + indicators]
+xxx_ols = run_OLS(xxx_df, 'Wealth Index', xxx_cols, 'adm2-final-noesa')
+# =========
 
 
-# # all OSM + NTL
+# # # all OSM + NTL
 # all_osm_ntl_cols = all_osm_cols + ntl_cols
-# all_osm_ntl_cv, all_osm_ntl_predictions = run_model_funcs(final_data_df, all_osm_ntl_cols, 'all-osm-ntl', n_splits=n_splits)
+# all_osm_ntl_cv = run_model_funcs(final_data_df, all_osm_ntl_cols, 'all-osm-ntl', n_splits=n_splits, tags=tags_dict)
 # all_osm_ntl_ols = run_OLS(final_data_df, 'Wealth Index', all_osm_ntl_cols, 'all-osm-ntl')
 
-# # NTL only
-# ntl_cv, ntl_predictions = run_model_funcs(final_data_df, ntl_cols, 'ntl', n_splits=n_splits)
+# # # NTL only
+# ntl_cv = run_model_funcs(final_data_df, ntl_cols, 'ntl', n_splits=n_splits, tags=tags_dict)
 # ntl_ols = run_OLS(final_data_df, 'Wealth Index', ntl_cols, 'ntl')
 
-# # all OSM only
-# all_osm_cv, all_osm_predictions = run_model_funcs(final_data_df, all_osm_cols, 'all-osm', n_splits=n_splits)
+# # # all OSM only
+# all_osm_cv = run_model_funcs(final_data_df, all_osm_cols, 'all-osm', n_splits=n_splits, tags=tags_dict)
 # all_osm_ols = run_OLS(final_data_df, 'Wealth Index', all_osm_cols, 'all-osm')
 
-# all OSM + all geo
+# # all OSM + all geo
 # all_data_cols = all_osm_cols + all_geo_cols
-# all_cv, all_predictions = run_model_funcs(final_data_df, all_data_cols, 'all', n_splits=n_splits)
+# all_cv = run_model_funcs(final_data_df, all_data_cols, 'all', n_splits=n_splits, tags=tags_dict)
 # all_ols = run_OLS(final_data_df, 'Wealth Index', all_data_cols, 'all')
 
 # # location only
-# loc_cv, loc_predictions = run_model_funcs(final_data_df, ['longitude', 'latitude'], 'loc', n_splits=n_splits)
+# loc_cv = run_model_funcs(final_data_df, ['longitude', 'latitude'], 'loc', n_splits=n_splits, tags=tags_dict)
 # loc_ols = run_OLS(final_data_df, 'Wealth Index', ['longitude', 'latitude'], 'loc')
 
-# # -----------------
+# # # -----------------
 
 # # sub OSM + NTL
 # sub_osm_ntl_cols = sub_osm_cols + ntl_cols
-# sub_osm_ntl_cv, sub_osm_ntl_predictions = run_model_funcs(final_data_df, sub_osm_ntl_cols, 'sub-osm-ntl', n_splits=n_splits)
+# sub_osm_ntl_cv = run_model_funcs(final_data_df, sub_osm_ntl_cols, 'sub-osm-ntl', n_splits=n_splits, tags=tags_dict)
 # sub_osm_ntl_ols = run_OLS(final_data_df, 'Wealth Index', sub_osm_ntl_cols, 'sub-osm-ntl')
 
 # # sub OSM only
-# sub_osm_cv, sub_osm_predictions = run_model_funcs(final_data_df, sub_osm_cols, 'sub-osm', n_splits=n_splits)
+# sub_osm_cv = run_model_funcs(final_data_df, sub_osm_cols, 'sub-osm', n_splits=n_splits, tags=tags_dict)
 # sub_osm_ols = run_OLS(final_data_df, 'Wealth Index', sub_osm_cols, 'sub-osm')
 
 # # sub OSM + all geo
 # sub_osm_all_geo_cols = sub_osm_cols + all_geo_cols
-# sub_osm_all_geo_cv, sub_osm_all_geo_predictions = run_model_funcs(final_data_df, sub_osm_all_geo_cols, 'sub-osm-all-geo', n_splits=n_splits)
+# sub_osm_all_geo_cv = run_model_funcs(final_data_df, sub_osm_all_geo_cols, 'sub-osm-all-geo', n_splits=n_splits, tags=tags_dict)
 # sub_osm_all_geo_ols = run_OLS(final_data_df, 'Wealth Index', sub_osm_all_geo_cols, 'sub-osm-all-geo')
 
-# all geo only
-# all_geo_cv, all_geo_predictions = run_model_funcs(final_data  _df, all_geo_cols, 'all-geo', n_splits=n_splits)
+# # all geo only
+# all_geo_cv = run_model_funcs(final_data_df, all_geo_cols, 'all-geo', n_splits=n_splits, tags=tags_dict)
 # all_geo_ols = run_OLS(final_data_df, 'Wealth Index', all_geo_cols, 'all-geo')
 
 # # -----------------
 
 # # sub geo
-# sub_geo_cv, sub_geo_predictions = run_model_funcs(final_data_df, sub_geo_cols, 'sub-geo', n_splits=n_splits)
+# sub_geo_cv = run_model_funcs(final_data_df, sub_geo_cols, 'sub-geo', n_splits=n_splits, tags=tags_dict)
 # sub_geo_ols = run_OLS(final_data_df, 'Wealth Index', sub_geo_cols, 'sub-geo')
 
 # sub OSM + sub geo
 sub_data_cols = sub_osm_cols + sub_geo_cols
-sub_cv = run_model_funcs(final_data_df, sub_data_cols, 'sub', n_splits=n_splits)
+sub_cv = run_model_funcs(final_data_df, sub_data_cols, 'sub', n_splits=n_splits, tags=tags_dict)
 sub_ols = run_OLS(final_data_df, 'Wealth Index', sub_data_cols, 'sub')
 
 # -----------------
@@ -286,10 +298,10 @@ sub_ols = run_OLS(final_data_df, 'Wealth Index', sub_data_cols, 'sub')
 
 # final_features = [f'viirs_{ntl_year}_median', f'worldpop_pop_count_1km_mosaic_{ntl_year}_mean',  f'viirs_{ntl_year}_max', f'esa_landcover_{ntl_year}_categorical_urban', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
 
-final_features = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', f'esa_landcover_categorical_urban', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
+# final_features = [f'viirs_median', f'worldpop_pop_count_1km_mosaic_mean',  f'viirs_max', f'esa_landcover_categorical_urban', 'longitude', 'latitude', 'all_roads_length', 'all_buildings_ratio']
 
 
-# final_cv, final_predictions = run_model_funcs(final_data_df, final_features, 'final', n_splits=n_splits)
+# final_cv, final_predictions = run_model_funcs(final_data_df, final_features, 'final', n_splits=n_splits, tags=tags_dict)
 # final_ols = run_OLS(final_data_df, 'Wealth Index', final_features, 'final')
 
 
@@ -420,7 +432,7 @@ Final               & 8   & 0.751 \\
 
 #     ecopia_features = [f'viirs_{ntl_year}_median', f'worldpop_pop_count_1km_mosaic_{ntl_year}_mean',  f'viirs_{ntl_year}_max', f'esa_landcover_{ntl_year}_categorical_urban', 'longitude', 'latitude', 'ecopia_roads_length', 'ecopia_buildings_ratio']
 
-#     ecopia_cv, ecopia_predictions = run_model_funcs(ecopia_data_df, ecopia_features, 'ecopia', n_splits=n_splits)
+#     ecopia_cv, ecopia_predictions = run_model_funcs(ecopia_data_df, ecopia_features, 'ecopia', n_splits=n_splits, tags=tags_dict)
 
 #     print(f"Ecopia              & {ecopia_cv.n_features_in_}   & {round(ecopia_cv.best_score_, 3)} \\\\")
 
